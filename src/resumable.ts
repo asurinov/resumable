@@ -1,9 +1,4 @@
-import { timingSafeEqual } from "crypto";
-
 export class Resumable {
-  private version: number;
-  private support: boolean;
-
   private defaults: any;
   opts: any;
   private events: any[] = [];
@@ -11,26 +6,6 @@ export class Resumable {
   files: ResumableFile[] = [];
 
   constructor(opts: any) {
-    this.version = 1.0;
-    // SUPPORTED BY BROWSER?
-    // Check if these features are support by the browser:
-    // - File object type
-    // - Blob object type
-    // - FileList object type
-    // - slicing files
-    this.support = (
-      (typeof (File) !== 'undefined')
-      &&
-      (typeof (Blob) !== 'undefined')
-      &&
-      (typeof (FileList) !== 'undefined')
-      &&
-      (!!Blob.prototype.webkitSlice || !!Blob.prototype.mozSlice || !!Blob.prototype.slice || false)
-    );
-    if (!this.support) {
-      return;
-    }
-
     // PROPERTIES
     this.files = [];
     this.defaults = {
@@ -88,24 +63,33 @@ export class Resumable {
     let $opt = this;
     // Get multiple option if passed an array
     if (o instanceof Array) {
-      var options = {};
-      Helper.each(o, (option) => {
+      const options = {};
+      Helper.each(o, option => {
         options[option] = $opt.getOpt(option);
       });
       return options;
     }
     // Otherwise, just return a simple option
     if ($opt instanceof ResumableChunk) {
-      if (typeof $opt.opts[o] !== 'undefined') { return $opt.opts[o]; }
-      else { $opt = $opt.fileObj; }
+      if (typeof $opt.opts[o] !== 'undefined') {
+        return $opt.opts[o];
+      } else {
+        $opt = $opt.fileObj;
+      }
     }
     if ($opt instanceof ResumableFile) {
-      if (typeof $opt.opts[o] !== 'undefined') { return $opt.opts[o]; }
-      else { $opt = $opt.resumableObj; }
+      if (typeof $opt.opts[o] !== 'undefined') {
+        return $opt.opts[o];
+      } else {
+        $opt = $opt.resumableObj;
+      }
     }
     if ($opt instanceof Resumable) {
-      if (typeof $opt.opts[o] !== 'undefined') { return $opt.opts[o]; }
-      else { return $opt.defaults[o]; }
+      if (typeof $opt.opts[o] !== 'undefined') {
+        return $opt.opts[o];
+      } else {
+        return $opt.defaults[o];
+      }
     }
   }
 
@@ -114,27 +98,24 @@ export class Resumable {
   }
 
   private fire(...args: any[]) {
-    // `arguments` is an object, not array, in FF, so:
-    var args: any[] = [];
-    for (var i = 0; i < arguments.length; i++) args.push(arguments[i]);
     // Find event listeners, and support pseudo-event `catchAll`
-    var event = args[0].toLowerCase();
-    for (var i = 0; i <= this.events.length; i += 2) {
-      if (this.events[i] == event) this.events[i + 1].apply(this, args.slice(1));
-      if (this.events[i] == 'catchall') this.events[i + 1].apply(null, args);
+    const event = args[0].toLowerCase();
+    for (let i = 0; i <= this.events.length; i += 2) {
+      if (this.events[i] === event) this.events[i + 1].apply(this, args.slice(1));
+      if (this.events[i] === 'catchall') this.events[i + 1].apply(null, args);
     }
-    if (event == 'fileerror') this.fire('error', args[2], args[1]);
-    if (event == 'fileprogress') this.fire('progress');
+    if (event === 'fileerror') this.fire('error', args[2], args[1]);
+    if (event === 'fileprogress') this.fire('progress');
   }
 
   private onDrop(event) {
     Helper.stopEvent(event);
 
-    //handle dropped things as items if we can (this lets us deal with folders nicer in some cases)
+    // handle dropped things as items if we can (this lets us deal with folders nicer in some cases)
     if (event.dataTransfer && event.dataTransfer.items) {
       this.loadFiles(event.dataTransfer.items, event);
     }
-    //else handle them as files
+    // else handle them as files
     else if (event.dataTransfer && event.dataTransfer.files) {
       this.loadFiles(event.dataTransfer.files, event);
     }
@@ -144,7 +125,7 @@ export class Resumable {
     e.preventDefault();
   }
 
-    /**
+  /**
    * processes a single upload item (file or directory)
    * @param {Object} item item to upload, may be file or directory entry
    * @param {string} path current file path
@@ -152,10 +133,10 @@ export class Resumable {
    * @param {Function} cb callback invoked when item is processed
    */
   private processItem(item, path, items, cb) {
-    var entry;
+    let entry;
     if (item.isFile) {
       // file provided
-      return item.file(function (file) {
+      return item.file(function(file) {
         file.relativePath = path + file.name;
         items.push(file);
         cb();
@@ -211,15 +192,15 @@ export class Resumable {
    * @param  {Function} cb        callback invoked after traversing directory
    */
   private processDirectory(directory, path, items, cb) {
-    var dirReader = directory.createReader();
-    dirReader.readEntries((entries) => {
+    const dirReader = directory.createReader();
+    dirReader.readEntries(entries => {
       if (!entries.length) {
         // empty directory, skip
         return cb();
       }
       // process all conversion callbacks, finally invoke own one
       this.processCallbacks(
-        entries.map((entry) => {
+        entries.map(entry => {
           // bind all properties except for callback
           return this.processItem.bind(null, entry, path, items);
         }),
@@ -238,11 +219,11 @@ export class Resumable {
       return; // nothing to do
     }
     this.fire('beforeAdd');
-    var files = [];
+    let files = [];
     this.processCallbacks(
-      Array.prototype.map.call(items, (item) => {
+      Array.prototype.map.call(items, item => {
         // bind all properties except for callback
-        return this.processItem.bind(null, item, "", files);
+        return this.processItem.bind(null, item, '', files);
       }),
       () => {
         if (files.length) {
@@ -255,9 +236,18 @@ export class Resumable {
 
   private appendFilesFromFileList(fileList, event) {
     // check for uploading too many files
-    var errorCount = 0;
-    var o = this.getOpt(['maxFiles', 'minFileSize', 'maxFileSize', 'maxFilesErrorCallback', 'minFileSizeErrorCallback', 'maxFileSizeErrorCallback', 'fileType', 'fileTypeErrorCallback']);
-    if (typeof (o.maxFiles) !== 'undefined' && o.maxFiles < (fileList.length + this.files.length)) {
+    let errorCount = 0;
+    const o = this.getOpt([
+      'maxFiles',
+      'minFileSize',
+      'maxFileSize',
+      'maxFilesErrorCallback',
+      'minFileSizeErrorCallback',
+      'maxFileSizeErrorCallback',
+      'fileType',
+      'fileTypeErrorCallback'
+    ]);
+    if (typeof o.maxFiles !== 'undefined' && o.maxFiles < fileList.length + this.files.length) {
       // if single-file upload, file is already added, and trying to add 1 new file, simply replace the already-added file
       if (o.maxFiles === 1 && this.files.length === 1 && fileList.length === 1) {
         this.removeFile(this.files[0]);
@@ -266,8 +256,10 @@ export class Resumable {
         return false;
       }
     }
-    var files: ResumableFile[] = [], filesSkipped: ResumableFile[] = [], remaining = fileList.length;
-    var decreaseReamining = () => {
+    let files: ResumableFile[] = [];
+    let filesSkipped: ResumableFile[] = [];
+    let remaining = fileList.length;
+    const decreaseReamining = () => {
       if (!--remaining) {
         // all files processed, trigger event
         if (!files.length && !filesSkipped.length) {
@@ -280,13 +272,17 @@ export class Resumable {
       }
     };
 
-    Helper.each(fileList, (file) => {
-      var fileName = file.name;
+    Helper.each(fileList, file => {
+      const fileName = file.name;
       if (o.fileType.length > 0) {
-        var fileTypeFound = false;
-        for (var index in o.fileType) {
-          var extension = '.' + o.fileType[index];
-          if (fileName.toLowerCase().indexOf(extension.toLowerCase(), fileName.length - extension.length) !== -1) {
+        let fileTypeFound = false;
+        for (let index in o.fileType) {
+          const extension = '.' + o.fileType[index];
+          if (
+            fileName
+              .toLowerCase()
+              .indexOf(extension.toLowerCase(), fileName.length - extension.length) !== -1
+          ) {
             fileTypeFound = true;
             break;
           }
@@ -297,129 +293,148 @@ export class Resumable {
         }
       }
 
-      if (typeof (o.minFileSize) !== 'undefined' && file.size < o.minFileSize) {
+      if (typeof o.minFileSize !== 'undefined' && file.size < o.minFileSize) {
         o.minFileSizeErrorCallback(file, errorCount++);
         return false;
       }
-      if (typeof (o.maxFileSize) !== 'undefined' && file.size > o.maxFileSize) {
+      if (typeof o.maxFileSize !== 'undefined' && file.size > o.maxFileSize) {
         o.maxFileSizeErrorCallback(file, errorCount++);
         return false;
       }
 
-      const addFile = (uniqueIdentifier) => {
+      const addFile = uniqueIdentifier => {
         if (!this.getFromUniqueIdentifier(uniqueIdentifier)) {
           (() => {
             file.uniqueIdentifier = uniqueIdentifier;
-            var f = new ResumableFile(this, file, uniqueIdentifier);
+            const f = new ResumableFile(this, file, uniqueIdentifier);
             this.files.push(f);
             files.push(f);
-            f.container = (typeof event != 'undefined' ? event.srcElement : null);
+            f.container = typeof event !== 'undefined' ? event.srcElement : null;
             window.setTimeout(() => {
-              this.fire('fileAdded', f, event)
+              this.fire('fileAdded', f, event);
             }, 0);
-          })()
+          })();
         } else {
           filesSkipped.push(file);
-        };
+        }
         decreaseReamining();
-      }
+      };
       // directories have size == 0
       const customUniqueIdentifierFn = this.getOpt('generateUniqueIdentifier');
 
-      var uniqueIdentifier = Helper.generateUniqueIdentifier(file, event, customUniqueIdentifierFn);
+      const uniqueIdentifier = Helper.generateUniqueIdentifier(
+        file,
+        event,
+        customUniqueIdentifierFn
+      );
       if (uniqueIdentifier && typeof uniqueIdentifier.then === 'function') {
         // Promise or Promise-like object provided as unique identifier
-        uniqueIdentifier.then((uniqueIdentifier) => {
-          // unique identifier generation succeeded
-          addFile(uniqueIdentifier);
-        }, () => {
-          // unique identifier generation failed
-          // skip further processing, only decrease file count
-          decreaseReamining();
-        });
+        uniqueIdentifier.then(
+          uniqueIdentifier => {
+            // unique identifier generation succeeded
+            addFile(uniqueIdentifier);
+          },
+          () => {
+            // unique identifier generation failed
+            // skip further processing, only decrease file count
+            decreaseReamining();
+          }
+        );
       } else {
         // non-Promise provided as unique identifier, process synchronously
         addFile(uniqueIdentifier);
       }
     });
-  };
+  }
 
   // QUEUE
   private uploadNextChunk() {
-    var found = false;
+    let found = false;
 
     // In some cases (such as videos) it's really handy to upload the first
     // and last chunk of a file quickly; this let's the server check the file's
     // metadata and determine if there's even a point in continuing.
     if (this.getOpt('prioritizeFirstAndLastChunk')) {
-      Helper.each(this.files, (file) => {
-        if (file.chunks.length && file.chunks[0].status() == 'pending' && file.chunks[0].preprocessState === 0) {
+      Helper.each(this.files, file => {
+        if (
+          file.chunks.length &&
+          file.chunks[0].status() === 'pending' &&
+          file.chunks[0].preprocessState === 0
+        ) {
           file.chunks[0].send();
           found = true;
-          return (false);
+          return false;
         }
-        if (file.chunks.length > 1 && file.chunks[file.chunks.length - 1].status() == 'pending' && file.chunks[file.chunks.length - 1].preprocessState === 0) {
+        if (
+          file.chunks.length > 1 &&
+          file.chunks[file.chunks.length - 1].status() === 'pending' &&
+          file.chunks[file.chunks.length - 1].preprocessState === 0
+        ) {
           file.chunks[file.chunks.length - 1].send();
           found = true;
-          return (false);
+          return false;
         }
       });
-      if (found) return (true);
+      if (found) return true;
     }
 
     // Now, simply look for the next, best thing to upload
-    Helper.each(this.files, (file) => {
+    Helper.each(this.files, file => {
       if (file.isPaused() === false) {
-        Helper.each(file.chunks, (chunk) => {
-          if (chunk.status() == 'pending' && chunk.preprocessState === 0) {
+        Helper.each(file.chunks, chunk => {
+          if (chunk.status() === 'pending' && chunk.preprocessState === 0) {
             chunk.send();
             found = true;
-            return (false);
+            return false;
           }
         });
       }
-      if (found) return (false);
+      if (found) return false;
     });
-    if (found) return (true);
+    if (found) return true;
 
     // The are no more outstanding chunks to upload, check is everything is done
-    var outstanding = false;
-    Helper.each(this.files, (file) => {
+    let outstanding = false;
+    Helper.each(this.files, file => {
       if (!file.isComplete()) {
         outstanding = true;
-        return (false);
+        return false;
       }
     });
     if (!outstanding) {
       // All chunks have been uploaded, complete
       this.fire('complete');
     }
-    return (false);
-  };
+    return false;
+  }
 
   // PUBLIC METHODS FOR RESUMABLE.JS
   assignBrowse(domNodes, isDirectory) {
-    if (typeof (domNodes.length) == 'undefined') domNodes = [domNodes];
+    if (typeof domNodes.length === 'undefined') domNodes = [domNodes];
 
-    Helper.each(domNodes, (domNode) => {
-      var input;
+    Helper.each(domNodes, domNode => {
+      let input;
       if (domNode.tagName === 'INPUT' && domNode.type === 'file') {
         input = domNode;
       } else {
         input = document.createElement('input');
         input.setAttribute('type', 'file');
         input.style.display = 'none';
-        domNode.addEventListener('click', () => {
-          input.style.opacity = 0;
-          input.style.display = 'block';
-          input.focus();
-          input.click();
-          input.style.display = 'none';
-        }, false);
+        domNode.addEventListener(
+          'click',
+          () => {
+            input.style.opacity = 0;
+            input.style.display = 'block';
+            input.focus();
+            input.click();
+            input.style.display = 'none';
+          },
+          false
+        );
         domNode.appendChild(input);
       }
-      var maxFiles = this.getOpt('maxFiles');
-      if (typeof (maxFiles) === 'undefined' || maxFiles != 1) {
+      const maxFiles = this.getOpt('maxFiles');
+      if (typeof maxFiles === 'undefined' || maxFiles !== 1) {
         input.setAttribute('multiple', 'multiple');
       } else {
         input.removeAttribute('multiple');
@@ -429,28 +444,38 @@ export class Resumable {
       } else {
         input.removeAttribute('webkitdirectory');
       }
-      var fileTypes = this.getOpt('fileType');
-      if (typeof (fileTypes) !== 'undefined' && fileTypes.length >= 1) {
-        input.setAttribute('accept', fileTypes.map((e) => { return '.' + e }).join(','));
-      }
-      else {
+      const fileTypes = this.getOpt('fileType');
+      if (typeof fileTypes !== 'undefined' && fileTypes.length >= 1) {
+        input.setAttribute(
+          'accept',
+          fileTypes
+            .map(e => {
+              return '.' + e;
+            })
+            .join(',')
+        );
+      } else {
         input.removeAttribute('accept');
       }
       // When new files are added, simply append them to the overall list
-      input.addEventListener('change', (e) => {
-        this.appendFilesFromFileList(e.target.files, e);
-        var clearInput = this.getOpt('clearInput');
-        if (clearInput) {
-          e.target.value = '';
-        }
-      }, false);
+      input.addEventListener(
+        'change',
+        e => {
+          this.appendFilesFromFileList(e.target.files, e);
+          const clearInput = this.getOpt('clearInput');
+          if (clearInput) {
+            e.target.value = '';
+          }
+        },
+        false
+      );
     });
   }
 
   assignDrop(domNodes) {
-    if (typeof (domNodes.length) == 'undefined') domNodes = [domNodes];
+    if (typeof domNodes.length === 'undefined') domNodes = [domNodes];
 
-    Helper.each(domNodes, (domNode) => {
+    Helper.each(domNodes, domNode => {
       domNode.addEventListener('dragover', this.preventDefault, false);
       domNode.addEventListener('dragenter', this.preventDefault, false);
       domNode.addEventListener('drop', this.onDrop, false);
@@ -458,9 +483,9 @@ export class Resumable {
   }
 
   unAssignDrop(domNodes) {
-    if (typeof (domNodes.length) == 'undefined') domNodes = [domNodes];
+    if (typeof domNodes.length === 'undefined') domNodes = [domNodes];
 
-    Helper.each(domNodes, (domNode) => {
+    Helper.each(domNodes, domNode => {
       domNode.removeEventListener('dragover', this.preventDefault);
       domNode.removeEventListener('dragenter', this.preventDefault);
       domNode.removeEventListener('drop', this.onDrop);
@@ -468,29 +493,29 @@ export class Resumable {
   }
 
   isUploading() {
-    var uploading = false;
+    let uploading = false;
     Helper.each(this.files, (file: ResumableFile) => {
       if (file.isUploading()) {
         uploading = true;
-        return (false);
+        return false;
       }
     });
-    return (uploading);
+    return uploading;
   }
 
-  upload () {
+  upload() {
     // Make sure we don't start too many uploads at once
     if (this.isUploading()) return;
     // Kick off the queue
     this.fire('uploadStart');
-    for (var num = 1; num <= this.getOpt('simultaneousUploads'); num++) {
+    for (let num = 1; num <= this.getOpt('simultaneousUploads'); num++) {
       this.uploadNextChunk();
     }
   }
 
   pause() {
     // Resume all chunks currently being uploaded
-    Helper.each(this.files, (file) => {
+    Helper.each(this.files, file => {
       file.abort();
     });
     this.fire('pause');
@@ -498,21 +523,21 @@ export class Resumable {
 
   cancel() {
     this.fire('beforeCancel');
-    for (var i = this.files.length - 1; i >= 0; i--) {
+    for (let i = this.files.length - 1; i >= 0; i--) {
       this.files[i].cancel();
     }
     this.fire('cancel');
   }
 
   progress() {
-    var totalDone = 0;
-    var totalSize = 0;
+    let totalDone = 0;
+    let totalSize = 0;
     // Resume all chunks currently being uploaded
-    Helper.each(this.files, (file) => {
+    Helper.each(this.files, file => {
       totalDone += file.progress() * file.size;
       totalSize += file.size;
     });
-    return (totalSize > 0 ? totalDone / totalSize : 0);
+    return totalSize > 0 ? totalDone / totalSize : 0;
   }
 
   addFile(file, event) {
@@ -524,7 +549,7 @@ export class Resumable {
   }
 
   removeFile(file) {
-    for (var i = this.files.length - 1; i >= 0; i--) {
+    for (let i = this.files.length - 1; i >= 0; i--) {
       if (this.files[i] === file) {
         this.files.splice(i, 1);
       }
@@ -540,19 +565,19 @@ export class Resumable {
   }
 
   getFromUniqueIdentifier(uniqueIdentifier) {
-    var ret = false;
-    Helper.each(this.files, (f) => {
-      if (f.uniqueIdentifier == uniqueIdentifier) ret = f;
+    let ret = false;
+    Helper.each(this.files, f => {
+      if (f.uniqueIdentifier === uniqueIdentifier) ret = f;
     });
-    return (ret);
+    return ret;
   }
 
   getSize() {
-    var totalSize = 0;
-    Helper.each(this.files, (file) => {
+    let totalSize = 0;
+    Helper.each(this.files, file => {
       totalSize += file.size;
     });
-    return (totalSize);
+    return totalSize;
   }
 
   handleDropEvent(e) {
@@ -568,23 +593,45 @@ export class Resumable {
     this.opts.query = query;
   }
 
-  
-
   maxFilesErrorCallback(files, errorCount) {
-    var maxFiles = this.getOpt('maxFiles');
-    alert('Please upload no more than ' + maxFiles + ' file' + (maxFiles === 1 ? '' : 's') + ' at a time.');
+    const maxFiles = this.getOpt('maxFiles');
+    alert(
+      'Please upload no more than ' +
+        maxFiles +
+        ' file' +
+        (maxFiles === 1 ? '' : 's') +
+        ' at a time.'
+    );
   }
 
   minFileSizeErrorCallback(file, errorCount) {
-    alert(file.fileName || file.name + ' is too small, please upload files larger than ' + Helper.formatSize(this.getOpt('minFileSize')) + '.');
+    alert(
+      file.fileName ||
+        file.name +
+          ' is too small, please upload files larger than ' +
+          Helper.formatSize(this.getOpt('minFileSize')) +
+          '.'
+    );
   }
 
   maxFileSizeErrorCallback(file, errorCount) {
-    alert(file.fileName || file.name + ' is too large, please upload files less than ' + Helper.formatSize(this.getOpt('maxFileSize')) + '.');
+    alert(
+      file.fileName ||
+        file.name +
+          ' is too large, please upload files less than ' +
+          Helper.formatSize(this.getOpt('maxFileSize')) +
+          '.'
+    );
   }
 
   fileTypeErrorCallback(file, errorCount) {
-    alert(file.fileName || file.name + ' has type not allowed, please upload files of type ' + this.getOpt('fileType') + '.');
+    alert(
+      file.fileName ||
+        file.name +
+          ' has type not allowed, please upload files of type ' +
+          this.getOpt('fileType') +
+          '.'
+    );
   }
 }
 
@@ -657,9 +704,9 @@ export class ResumableFile {
 
   abort() {
     // Stop current uploads
-    var abortCount = 0;
-    Helper.each(this.chunks, (c) => {
-      if (c.status() == 'uploading') {
+    let abortCount = 0;
+    Helper.each(this.chunks, c => {
+      if (c.status() === 'uploading') {
         c.abort();
         abortCount++;
       }
@@ -669,11 +716,11 @@ export class ResumableFile {
 
   cancel() {
     // Reset this file to be void
-    var _chunks = this.chunks;
+    let _chunks = this.chunks;
     this.chunks = [];
     // Stop current uploads
-    Helper.each(_chunks, (c) => {
-      if (c.status() == 'uploading') {
+    Helper.each(_chunks, c => {
+      if (c.status() === 'uploading') {
         c.abort();
         this.resumableObj.uploadNextChunk();
       }
@@ -684,7 +731,7 @@ export class ResumableFile {
 
   retry() {
     this.bootstrap();
-    var firedRetry = false;
+    let firedRetry = false;
     this.resumableObj.on('chunkingComplete', () => {
       if (!firedRetry) this.resumableObj.upload();
       firedRetry = true;
@@ -697,12 +744,14 @@ export class ResumableFile {
     // Rebuild stack of chunks from file
     this.chunks = [];
     this._prevProgress = 0;
-    var round = this.getOpt('forceChunkSize') ? Math.ceil : Math.floor;
-    var maxOffset = Math.max(round(this.file.size / this.getOpt('chunkSize')), 1);
+    const round = this.getOpt('forceChunkSize') ? Math.ceil : Math.floor;
+    const maxOffset = Math.max(round(this.file.size / this.getOpt('chunkSize')), 1);
 
     for (let offset = 0; offset < maxOffset; offset++) {
       window.setTimeout(() => {
-        this.chunks.push(new ResumableChunk(this.resumableObj, this, offset, this.chunkEvent.bind(this)));
+        this.chunks.push(
+          new ResumableChunk(this.resumableObj, this, offset, this.chunkEvent.bind(this))
+        );
         this.resumableObj.fire('chunkingProgress', this, offset / maxOffset);
       }, 0);
     }
@@ -712,46 +761,46 @@ export class ResumableFile {
   }
 
   progress() {
-    if (this._error) return (1);
+    if (this._error) return 1;
     // Sum up progress across everything
-    var ret = 0;
-    var error = false;
-    Helper.each(this.chunks, (c) => {
-      if (c.status() == 'error') error = true;
+    let ret = 0;
+    let error = false;
+    Helper.each(this.chunks, c => {
+      if (c.status() === 'error') error = true;
       ret += c.progress(true); // get chunk progress relative to entire file
     });
-    ret = (error ? 1 : (ret > 0.99999 ? 1 : ret));
+    ret = error ? 1 : ret > 0.99999 ? 1 : ret;
     ret = Math.max(this._prevProgress, ret); // We don't want to lose percentages when an upload is paused
     this._prevProgress = ret;
-    return (ret);
+    return ret;
   }
 
   isUploading() {
-    var uploading = false;
+    let uploading = false;
     Helper.each(this.chunks, (chunk: ResumableChunk) => {
-      if (chunk.status() == 'uploading') {
+      if (chunk.status() === 'uploading') {
         uploading = true;
-        return (false);
+        return false;
       }
     });
-    return (uploading);
+    return uploading;
   }
 
   isComplete() {
-    var outstanding = false;
-    Helper.each(this.chunks, (chunk) => {
-      var status = chunk.status();
-      if (status == 'pending' || status == 'uploading' || chunk.preprocessState === 1) {
+    let outstanding = false;
+    Helper.each(this.chunks, chunk => {
+      const status = chunk.status();
+      if (status === 'pending' || status === 'uploading' || chunk.preprocessState === 1) {
         outstanding = true;
-        return (false);
+        return false;
       }
     });
-    return (!outstanding);
+    return !outstanding;
   }
 
   pause(pause) {
-    if (typeof (pause) === 'undefined') {
-      this._pause = (this._pause ? false : true);
+    if (typeof pause === 'undefined') {
+      this._pause = this._pause ? false : true;
     } else {
       this._pause = pause;
     }
@@ -792,14 +841,14 @@ class ResumableChunk {
     this.fileObjType = fileObj.file.type;
     this.offset = offset;
     this.callback = callback;
-    this.lastProgressCallback = (new Date);
+    this.lastProgressCallback = new Date();
     this.tested = false;
     this.retries = 0;
     this.pendingRetry = false;
     this.preprocessState = 0; // 0 = unprocessed, 1 = processing, 2 = finished
 
     // Computed properties
-    var chunkSize = this.getOpt('chunkSize');
+    const chunkSize = this.getOpt('chunkSize');
     this.loaded = 0;
     this.startByte = this.offset * chunkSize;
     this.endByte = Math.min(this.fileObjSize, (this.offset + 1) * chunkSize);
@@ -807,7 +856,7 @@ class ResumableChunk {
       // The last chunk will be bigger than the chunk size, but less than 2*chunkSize
       this.endByte = this.fileObjSize;
     }
-    this.xhr = <any>null;
+    this.xhr = null as any;
   }
 
   // test() makes a GET request without any data to see if the chunk has already been uploaded in a previous session
@@ -815,10 +864,10 @@ class ResumableChunk {
     // Set up request and listen for event
     this.xhr = new XMLHttpRequest();
 
-    var testHandler = (e) => {
+    const testHandler = e => {
       this.tested = true;
-      var status = this.status();
-      if (status == 'success') {
+      const status = this.status();
+      if (status === 'success') {
         this.callback(status, this.message());
         this.resumableObj.uploadNextChunk();
       } else {
@@ -831,10 +880,10 @@ class ResumableChunk {
     this.xhr.addEventListener('timeout', testHandler, false);
 
     // Add data from the query options
-    var params: string[] = [];
-    var parameterNamespace = this.getOpt('parameterNamespace');
-    var customQuery = this.getOpt('query');
-    if (typeof customQuery == 'function') customQuery = customQuery(this.fileObj, this);
+    let params: string[] = [];
+    const parameterNamespace = this.getOpt('parameterNamespace');
+    let customQuery = this.getOpt('query');
+    if (typeof customQuery === 'function') customQuery = customQuery(this.fileObj, this);
     Helper.each(customQuery, (k, v) => {
       params.push([encodeURIComponent(parameterNamespace + k), encodeURIComponent(v)].join('='));
     });
@@ -851,28 +900,26 @@ class ResumableChunk {
         ['fileNameParameterName', this.fileObj.fileName],
         ['relativePathParameterName', this.fileObj.relativePath],
         ['totalChunksParameterName', this.fileObj.chunks.length]
-      ].filter((pair) => {
-        // include items that resolve to truthy values
-        // i.e. exclude false, null, undefined and empty strings
-        return this.getOpt(pair[0]);
-      })
-        .map((pair) => {
+      ]
+        .filter(pair => {
+          // include items that resolve to truthy values
+          // i.e. exclude false, null, undefined and empty strings
+          return this.getOpt(pair[0]);
+        })
+        .map(pair => {
           // map each key/value pair to its final form
-          return [
-            parameterNamespace + this.getOpt(pair[0]),
-            encodeURIComponent(pair[1])
-          ].join('=');
+          return [parameterNamespace + this.getOpt(pair[0]), encodeURIComponent(pair[1])].join('=');
         })
     );
     // Append the relevant chunk and send it
-    var target = this.getOpt('target');
-    var testTarget = this.getOpt('testTarget');
+    const target = this.getOpt('target');
+    const testTarget = this.getOpt('testTarget');
 
     this.xhr.open(this.getOpt('testMethod'), Helper.getTarget('test', params, target, testTarget));
     this.xhr.timeout = this.getOpt('xhrTimeout');
     this.xhr.withCredentials = this.getOpt('withCredentials');
     // Add data from header options
-    var customHeaders = this.getOpt('headers');
+    let customHeaders = this.getOpt('headers');
     if (typeof customHeaders === 'function') {
       customHeaders = customHeaders(this.fileObj, this);
     }
@@ -889,12 +936,17 @@ class ResumableChunk {
 
   // send() uploads the actual data in a POST call
   send() {
-    var preprocess = this.getOpt('preprocess');
+    const preprocess = this.getOpt('preprocess');
     if (typeof preprocess === 'function') {
       switch (this.preprocessState) {
-        case 0: this.preprocessState = 1; preprocess(this); return;
-        case 1: return;
-        case 2: break;
+        case 0:
+          this.preprocessState = 1;
+          preprocess(this);
+          return;
+        case 1:
+          return;
+        case 2:
+          break;
       }
     }
     if (this.getOpt('testChunks') && !this.tested) {
@@ -906,28 +958,35 @@ class ResumableChunk {
     this.xhr = new XMLHttpRequest();
 
     // Progress
-    this.xhr.upload.addEventListener('progress', (e) => {
-      if (Date.now() - this.lastProgressCallback > this.getOpt('throttleProgressCallbacks') * 1000) {
-        this.callback('progress');
-        this.lastProgressCallback = (new Date);
-      }
-      this.loaded = e.loaded || 0;
-    }, false);
+    this.xhr.upload.addEventListener(
+      'progress',
+      e => {
+        if (
+          Date.now() - this.lastProgressCallback >
+          this.getOpt('throttleProgressCallbacks') * 1000
+        ) {
+          this.callback('progress');
+          this.lastProgressCallback = new Date();
+        }
+        this.loaded = e.loaded || 0;
+      },
+      false
+    );
     this.loaded = 0;
     this.pendingRetry = false;
     this.callback('progress');
 
     // Done (either done, failed or retry)
-    const doneHandler = (e) => {
-      var status = this.status();
-      if (status == 'success' || status == 'error') {
+    const doneHandler = e => {
+      const status = this.status();
+      if (status === 'success' || status === 'error') {
         this.callback(status, this.message());
         this.resumableObj.uploadNextChunk();
       } else {
         this.callback('retry', this.message());
         this.abort();
         this.retries++;
-        var retryInterval = this.getOpt('chunkRetryInterval');
+        const retryInterval = this.getOpt('chunkRetryInterval');
         if (retryInterval !== undefined) {
           this.pendingRetry = true;
           setTimeout(this.send, retryInterval);
@@ -942,7 +1001,7 @@ class ResumableChunk {
     this.xhr.addEventListener('timeout', doneHandler, false);
 
     // Set up the basic query data from Resumable
-    var query = [
+    const query = [
       ['chunkNumberParameterName', this.offset + 1],
       ['chunkSizeParameterName', this.getOpt('chunkSize')],
       ['currentChunkSizeParameterName', this.endByte - this.startByte],
@@ -951,32 +1010,43 @@ class ResumableChunk {
       ['identifierParameterName', this.fileObj.uniqueIdentifier],
       ['fileNameParameterName', this.fileObj.fileName],
       ['relativePathParameterName', this.fileObj.relativePath],
-      ['totalChunksParameterName', this.fileObj.chunks.length],
-    ].filter((pair) => {
-      // include items that resolve to truthy values
-      // i.e. exclude false, null, undefined and empty strings
-      return this.getOpt(pair[0]);
-    })
-    .reduce((query, pair) => {
-      // assign query key/value
-      query[this.getOpt(pair[0])] = pair[1];
-      return query;
-    }, {});
+      ['totalChunksParameterName', this.fileObj.chunks.length]
+    ]
+      .filter(pair => {
+        // include items that resolve to truthy values
+        // i.e. exclude false, null, undefined and empty strings
+        return this.getOpt(pair[0]);
+      })
+      .reduce((query, pair) => {
+        // assign query key/value
+        query[this.getOpt(pair[0])] = pair[1];
+        return query;
+      }, {});
     // Mix in custom data
-    var customQuery = this.getOpt('query');
-    if (typeof customQuery == 'function') customQuery = customQuery(this.fileObj, this);
+    let customQuery = this.getOpt('query');
+    if (typeof customQuery === 'function') customQuery = customQuery(this.fileObj, this);
     Helper.each(customQuery, (k, v) => {
       query[k] = v;
     });
 
-    var func = (this.fileObj.file.slice ? 'slice' : (this.fileObj.file.mozSlice ? 'mozSlice' : (this.fileObj.file.webkitSlice ? 'webkitSlice' : 'slice')));
-    var bytes = this.fileObj.file[func](this.startByte, this.endByte, this.getOpt('setChunkTypeFromFile') ? this.fileObj.file.type : "");
-    var params: string[] = [];
+    const func = this.fileObj.file.slice
+      ? 'slice'
+      : this.fileObj.file.mozSlice
+      ? 'mozSlice'
+      : this.fileObj.file.webkitSlice
+      ? 'webkitSlice'
+      : 'slice';
+    const bytes = this.fileObj.file[func](
+      this.startByte,
+      this.endByte,
+      this.getOpt('setChunkTypeFromFile') ? this.fileObj.file.type : ''
+    );
+    const params: string[] = [];
 
-    let data: Blob = <any>null;
-    let formData: FormData = <any>null;
+    let data: Blob = null as any;
+    let formData: FormData = null as any;
 
-    var parameterNamespace = this.getOpt('parameterNamespace');
+    const parameterNamespace = this.getOpt('parameterNamespace');
     if (this.getOpt('method') === 'octet') {
       // Add data from the query options
       data = bytes;
@@ -990,24 +1060,30 @@ class ResumableChunk {
         formData.append(parameterNamespace + k, v);
         params.push([encodeURIComponent(parameterNamespace + k), encodeURIComponent(v)].join('='));
       });
-      if (this.getOpt('chunkFormat') == 'blob') {
-        formData.append(parameterNamespace + this.getOpt('fileParameterName'), bytes, this.fileObj.fileName);
-      }
-      else if (this.getOpt('chunkFormat') == 'base64') {
-        var fr = new FileReader();
-        fr.onload = (e) => {
-          formData.append(parameterNamespace + this.getOpt('fileParameterName'), <string>fr.result);
+      if (this.getOpt('chunkFormat') === 'blob') {
+        formData.append(
+          parameterNamespace + this.getOpt('fileParameterName'),
+          bytes,
+          this.fileObj.fileName
+        );
+      } else if (this.getOpt('chunkFormat') === 'base64') {
+        const fr = new FileReader();
+        fr.onload = e => {
+          formData.append(
+            parameterNamespace + this.getOpt('fileParameterName'),
+            fr.result as string
+          );
           this.xhr.send(formData);
-        }
+        };
         fr.readAsDataURL(bytes);
       }
     }
 
-    var targetOpt = this.getOpt('target');
-    var testTargetOpt = this.getOpt('testTarget');
+    const targetOpt = this.getOpt('target');
+    const testTargetOpt = this.getOpt('testTarget');
 
-    var target = Helper.getTarget('upload', params, targetOpt, testTargetOpt);
-    var method = this.getOpt('uploadMethod');
+    const target = Helper.getTarget('upload', params, targetOpt, testTargetOpt);
+    const method = this.getOpt('uploadMethod');
 
     this.xhr.open(method, target);
     if (this.getOpt('method') === 'octet') {
@@ -1016,7 +1092,7 @@ class ResumableChunk {
     this.xhr.timeout = this.getOpt('xhrTimeout');
     this.xhr.withCredentials = this.getOpt('withCredentials');
     // Add data from header options
-    var customHeaders = this.getOpt('headers');
+    let customHeaders = this.getOpt('headers');
     if (typeof customHeaders === 'function') {
       customHeaders = customHeaders(this.fileObj, this);
     }
@@ -1025,7 +1101,7 @@ class ResumableChunk {
       this.xhr.setRequestHeader(k, v);
     });
 
-    if (this.getOpt('chunkFormat') == 'blob') {
+    if (this.getOpt('chunkFormat') === 'blob') {
       this.xhr.send(formData || data);
     }
   }
@@ -1033,7 +1109,7 @@ class ResumableChunk {
   abort() {
     // Abort and reset
     if (this.xhr) this.xhr.abort();
-    this.xhr = <any>null;
+    this.xhr = null as any;
   }
 
   status() {
@@ -1041,46 +1117,49 @@ class ResumableChunk {
     if (this.pendingRetry) {
       // if pending retry then that's effectively the same as actively uploading,
       // there might just be a slight delay before the retry starts
-      return ('uploading');
+      return 'uploading';
     } else if (!this.xhr) {
-      return ('pending');
+      return 'pending';
     } else if (this.xhr.readyState < 4) {
       // Status is really 'OPENED', 'HEADERS_RECEIVED' or 'LOADING' - meaning that stuff is happening
-      return ('uploading');
+      return 'uploading';
     } else {
-      if (this.xhr.status == 200 || this.xhr.status == 201) {
+      if (this.xhr.status === 200 || this.xhr.status === 201) {
         // HTTP 200, 201 (created)
-        return ('success');
-      } else if (Helper.contains(this.getOpt('permanentErrors'), this.xhr.status) || this.retries >= this.getOpt('maxChunkRetries')) {
+        return 'success';
+      } else if (
+        Helper.contains(this.getOpt('permanentErrors'), this.xhr.status) ||
+        this.retries >= this.getOpt('maxChunkRetries')
+      ) {
         // HTTP 415/500/501, permanent error
-        return ('error');
+        return 'error';
       } else {
         // this should never happen, but we'll reset and queue a retry
         // a likely case for this would be 503 service unavailable
         this.abort();
-        return ('pending');
+        return 'pending';
       }
     }
   }
 
   message() {
-    return (this.xhr ? this.xhr.responseText : '');
+    return this.xhr ? this.xhr.responseText : '';
   }
 
   progress(relative) {
-    if (typeof (relative) === 'undefined') relative = false;
-    var factor = (relative ? (this.endByte - this.startByte) / this.fileObjSize : 1);
-    if (this.pendingRetry) return (0);
-    if (!this.xhr || !this.xhr.status) factor *= .95;
-    var s = this.status();
+    if (typeof relative === 'undefined') relative = false;
+    let factor = relative ? (this.endByte - this.startByte) / this.fileObjSize : 1;
+    if (this.pendingRetry) return 0;
+    if (!this.xhr || !this.xhr.status) factor *= 0.95;
+    const s = this.status();
     switch (s) {
       case 'success':
       case 'error':
-        return (1 * factor);
+        return 1 * factor;
       case 'pending':
-        return (0 * factor);
+        return 0 * factor;
       default:
-        return (this.loaded / (this.endByte - this.startByte) * factor);
+        return (this.loaded / (this.endByte - this.startByte)) * factor;
     }
   }
 }
@@ -1092,8 +1171,8 @@ abstract class Helper {
   }
 
   static each<T>(o: T[] | Object, callback) {
-    if ((o instanceof FileList || Array.isArray(o)) && typeof (o.length) !== 'undefined') {
-      for (var i = 0; i < o.length; i++) {
+    if (o instanceof FileList || Array.isArray(o)) {
+      for (let i = 0; i < o.length; i++) {
         // Array or FileList
         if (callback(o[i]) === false) return;
       }
@@ -1109,16 +1188,16 @@ abstract class Helper {
     if (typeof customFn === 'function') {
       return customFn(file, event);
     }
-    var relativePath = file.webkitRelativePath || file.fileName || file.name; // Some confusion in different versions of Firefox
-    var size = file.size;
-    return (size + '-' + relativePath.replace(/[^0-9a-zA-Z_-]/img, ''));
+    const relativePath = file.webkitRelativePath || file.fileName || file.name; // Some confusion in different versions of Firefox
+    const size = file.size;
+    return size + '-' + relativePath.replace(/[^0-9a-zA-Z_-]/gim, '');
   }
 
   static contains(array, test) {
-    var result = false;
+    let result = false;
 
-    Helper.each(array, (value) => {
-      if (value == test) {
+    Helper.each(array, value => {
+      if (value === test) {
         result = true;
         return false;
       }
@@ -1149,8 +1228,8 @@ abstract class Helper {
       return target(params);
     }
 
-    var separator = target.indexOf('?') < 0 ? '?' : '&';
-    var joinedParams = params.join('&');
+    const separator = target.indexOf('?') < 0 ? '?' : '&';
+    const joinedParams = params.join('&');
 
     return target + separator + joinedParams;
   }
