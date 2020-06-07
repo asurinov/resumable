@@ -1,11 +1,13 @@
 {
-  "name": "resumable",
+  "name": "resumable-ts",
   "version": "0.0.0-development",
   "description": "A JavaScript library for providing multiple simultaneous, stable, fault-tolerant and resumable/restartable uploads via the HTML5 File API.",
-  "keywords": [],
+  "keywords": [
+    "resumable", "upload", "file"
+  ],
   "main": "dist/resumable.umd.js",
   "module": "dist/resumable.es5.js",
-  "typings": "dist/types/resumable.d.ts",
+  "typings": "dist/types/index.d.ts",
   "files": [
     "dist"
   ],
